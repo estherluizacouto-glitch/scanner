@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+
+# Env / secrets — never commit real API keys here
+.env
+.env.local
+*.local
+
+# Node (caso adicione tooling depois)
+node_modules/
+dist/

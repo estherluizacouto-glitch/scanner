@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner — Prospecção de canais</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 26 26" fill="none">
+          <circle cx="13" cy="13" r="10" stroke="#4fd1a5" stroke-width="1.6"/>
+          <circle cx="13" cy="13" r="4.2" stroke="#4fd1a5" stroke-width="1.6"/>
+          <circle cx="13" cy="13" r="1.6" fill="#4fd1a5"/>
+        </svg>
+      </div>
+      <h1>Scanner</h1>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="search">Buscar</button>
+      <button class="tab-btn" data-tab="leads">Leads <span id="leadCountBadge"></span></button>
+      <button class="tab-btn" data-tab="keys">Chaves API</button>
+    </div>
+  </div>
+
+  <div class="body-area">
+    <!-- SEARCH PANEL -->
+    <div class="panel" id="searchPanel">
+      <div>
+        <label>Nichos (até 3)</label>
+        <input type="text" id="nicheInput" placeholder="ex: minecraft smp — Enter para add">
+        <div class="tags" id="nicheTags"></div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>País</label>
+          <select id="countrySelect">
+            <option value="">Qualquer</option>
+            <option value="BR">🇧🇷 Brasil</option>
+            <option value="US">🇺🇸 EUA</option>
+            <option value="PT">🇵🇹 Portugal</option>
+            <option value="MX">🇲🇽 México</option>
+            <option value="AR">🇦🇷 Argentina</option>
+            <option value="ES">🇪🇸 Espanha</option>
+            <option value="FR">🇫🇷 França</option>
+            <option value="DE">🇩🇪 Alemanha</option>
+            <option value="IT">🇮🇹 Itália</option>
+            <option value="GB">🇬🇧 Reino Unido</option>
+            <option value="CA">🇨🇦 Canadá</option>
+            <option value="AU">🇦🇺 Austrália</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Qtd. desejada</label>
+          <input type="number" id="countInput" value="20" min="5" max="150" step="5">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Mín. inscritos</label>
+          <input type="number" id="minSubs" value="1000" min="0" step="1000">
+        </div>
+        <div class="field">
+          <label>Máx. inscritos</label>
+          <input type="number" id="maxSubs" value="50000" min="0" step="1000">
+        </div>
+      </div>
+      <div class="field">
+        <label style="display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" id="requireEmail" style="width:auto;"> Só com e-mail público
+        </label>
+      </div>
+      <div class="divider"></div>
+      <button class="btn" id="searchBtn">Iniciar busca</button>
+      <p class="hint" id="quotaHint">Buscas amplas gastam menos cota e trazem mais resultados. Buscas específicas gastam mais e trazem menos, porém mais precisos.</p>
+    </div>
+
+    <!-- MAIN: SEARCH RESULTS -->
+    <div class="main" id="mainSearch">
+      <div class="scan-log" id="scanLog"></div>
+      <div id="resultsRoot"></div>
+    </div>
+
+    <!-- MAIN: LEADS (hidden by default) -->
+    <div class="main" id="mainLeads" style="display:none;flex:1;">
+      <div class="toolbar">
+        <div class="lead-filters" id="leadFilters"></div>
+        <button class="btn btn-secondary" id="exportBtn">Exportar CSV</button>
+      </div>
+      <div id="leadsRoot"></div>
+    </div>
+
+    <!-- MAIN: KEYS -->
+    <div class="main" id="mainKeys" style="display:none;flex:1;max-width:560px;">
+      <h3 style="margin-bottom:6px;">Suas chaves da YouTube Data API</h3>
+      <p class="hint" style="margin-bottom:16px;">
+        Gere uma chave gratuita no Google Cloud Console (API "YouTube Data API v3") e cole abaixo.
+        Cada chave tem 10.000 unidades/dia. Adicione mais de uma para o Scanner alternar
+        automaticamente quando uma esgotar. As chaves ficam salvas só no seu navegador
+        (localStorage) — nunca são enviadas a nenhum servidor além do Google.
+      </p>
+      <div class="field">
+        <input type="text" id="newKeyInput" placeholder="AIza...">
+      </div>
+      <button class="btn" id="addKeyBtn" style="margin-top:8px;">Adicionar chave</button>
+      <div class="divider" style="margin:18px 0;"></div>
+      <div class="keys-box" id="keysBox"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
