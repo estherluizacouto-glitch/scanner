@@ -1,10 +1,14 @@
 const STORE_KEYS = 'scanner_api_keys';
 const STORE_LEADS = 'scanner_leads';
+const STORE_RESULTS = 'scanner_last_results';
+const STORE_HISTORY = 'scanner_history';
+const MAX_HISTORY = 20;
 
 let apiKeys = [];   // {key, used, exhausted}
 let leads = [];
 let niches = [];
 let lastResults = [];
+let history = [];   // [{id, ts, query, country, minSubs, maxSubs, recentDays, requireEmail, results}]
 let leadFilter = 'all';
 let searching = false;
 
@@ -24,9 +28,15 @@ function loadState(){
   catch(e){ apiKeys = []; }
   try{ leads = JSON.parse(localStorage.getItem(STORE_LEADS) || '[]'); }
   catch(e){ leads = []; }
+  try{ lastResults = JSON.parse(localStorage.getItem(STORE_RESULTS) || '[]'); }
+  catch(e){ lastResults = []; }
+  try{ history = JSON.parse(localStorage.getItem(STORE_HISTORY) || '[]'); }
+  catch(e){ history = []; }
   renderKeys();
   renderLeads();
   updateLeadBadge();
+  renderResults();
+  renderHistory();
 }
 function saveKeys(){
   try{ localStorage.setItem(STORE_KEYS, JSON.stringify(apiKeys)); }
@@ -35,6 +45,23 @@ function saveKeys(){
 function saveLeads(){
   try{ localStorage.setItem(STORE_LEADS, JSON.stringify(leads)); }
   catch(e){ toast('Erro ao salvar leads'); }
+}
+function saveResults(){
+  try{ localStorage.setItem(STORE_RESULTS, JSON.stringify(lastResults)); }
+  catch(e){ toast('Erro ao salvar resultados (armazenamento cheio?)'); }
+}
+function saveHistory(){
+  try{ localStorage.setItem(STORE_HISTORY, JSON.stringify(history)); }
+  catch(e){
+    // provavelmente estourou a cota do localStorage — solta as entradas mais antigas e tenta de novo
+    if(history.length > 1){
+      history = history.slice(0, Math.max(1, Math.floor(history.length/2)));
+      saveHistory();
+      toast('Histórico ficou grande demais — mantive só as buscas mais recentes');
+    } else {
+      toast('Erro ao salvar histórico');
+    }
+  }
 }
 
 // ---------- tabs ----------
@@ -258,9 +285,76 @@ async function runSearch(){
 
   $('#scanLog').style.display = 'none';
   lastResults = matched;
+  saveResults();
+
+  if(matched.length){
+    history.unshift({
+      id: Date.now(),
+      ts: Date.now(),
+      query, country, minSubs, maxSubs, recentDays, requireEmail,
+      results: matched
+    });
+    if(history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+    saveHistory();
+    renderHistory();
+  }
+
   renderResults();
   btn.disabled = false; btn.textContent = 'Iniciar busca';
   searching = false;
+}
+
+function renderHistory(){
+  const box = $('#historyBox');
+  if(!box) return;
+  if(!history.length){
+    box.innerHTML = '<p class="hint">Nenhuma busca salva ainda.</p>';
+    return;
+  }
+  box.innerHTML = history.map((h,i)=>{
+    const when = timeAgo(h.ts);
+    const filters = [
+      h.country ? flagFor(h.country) : null,
+      (h.minSubs || (h.maxSubs && isFinite(h.maxSubs))) ? `${formatSubs(h.minSubs||0)}–${h.maxSubs && isFinite(h.maxSubs) ? formatSubs(h.maxSubs) : '∞'}` : null,
+      h.recentDays ? `últ. ${h.recentDays}d` : null,
+      h.requireEmail ? 'c/ e-mail' : null,
+    ].filter(Boolean).join(' · ');
+    return `<div class="history-item">
+      <div class="history-info">
+        <div class="history-query">${escapeHtml(h.query)}</div>
+        <div class="history-meta">${h.results.length} canais · ${when}${filters ? ' · '+filters : ''}</div>
+      </div>
+      <div class="history-actions">
+        <button class="icon-btn" data-restore="${i}" title="reabrir estes resultados">↺</button>
+        <button class="icon-btn" data-del-hist="${i}" title="remover do histórico">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+  $$('[data-restore]').forEach(b=>b.addEventListener('click', ()=>{
+    const h = history[parseInt(b.dataset.restore)];
+    lastResults = h.results;
+    saveResults();
+    renderResults();
+    $$('.tab-btn').forEach(t=>t.classList.remove('active'));
+    $('[data-tab="search"]').classList.add('active');
+    $('#searchPanel').style.display = 'flex';
+    $('#mainSearch').style.display = 'block';
+    $('#mainLeads').style.display = 'none';
+    $('#mainKeys').style.display = 'none';
+    toast('Resultados restaurados do histórico (sem gastar cota)');
+  }));
+  $$('[data-del-hist]').forEach(b=>b.addEventListener('click', ()=>{
+    history.splice(parseInt(b.dataset.delHist),1);
+    saveHistory();
+    renderHistory();
+  }));
+}
+function timeAgo(ts){
+  const diff = Math.floor((Date.now()-ts)/1000);
+  if(diff < 60) return 'agora';
+  if(diff < 3600) return Math.floor(diff/60)+'min atrás';
+  if(diff < 86400) return Math.floor(diff/3600)+'h atrás';
+  return Math.floor(diff/86400)+'d atrás';
 }
 
 function renderResults(){

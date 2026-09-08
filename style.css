@@ -52,6 +52,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .pill.hot{background:#4a2f1c;color:var(--amber);}
 .pill.dead{background:#3a232a;color:var(--coral);}
 .hint{font-size:11.5px;color:var(--text-muted);line-height:1.5;margin-top:6px;}
+.history-box{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;}
+.history-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.history-info{min-width:0;}
+.history-query{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.history-meta{font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.history-actions{display:flex;gap:2px;flex-shrink:0;}
+.history-actions .icon-btn:hover{color:var(--accent);}
+.history-actions [data-del-hist]:hover{color:var(--coral);}
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 20px;color:var(--text-muted);gap:10px;}
 .empty svg{opacity:.5;margin-bottom:6px;}
 .empty h3{color:var(--text);font-size:16px;}

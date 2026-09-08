@@ -71,10 +71,13 @@ scanner/
 
 ## Onde os dados ficam salvos
 
-Chaves de API e leads importados ficam salvos no **localStorage** do seu
-navegador — não são enviados para nenhum servidor além das chamadas diretas
-à API do Google. Isso também significa que os dados são por navegador/
-dispositivo; não sincronizam entre máquinas.
+Chaves de API, leads importados, o resultado da última busca e o histórico
+de buscas ficam salvos no **localStorage** do seu navegador — não são
+enviados para nenhum servidor além das chamadas diretas à API do Google.
+Isso também significa que os dados são por navegador/dispositivo; não
+sincronizam entre máquinas. O histórico guarda as últimas 20 buscas (com
+os canais encontrados em cada uma); se o navegador reclamar de espaço, o
+Scanner descarta automaticamente as buscas mais antigas do histórico.
 
 ## Funcionalidades
 
@@ -83,6 +86,10 @@ dispositivo; não sincronizam entre máquinas.
   descrição do canal
 - Filtro "só com e-mail público"
 - Filtro "postou recentemente" (30/60/90/180 dias) — descarta canais inativos
+- Resultado da última busca fica salvo — dar F5 não apaga mais os canais
+  encontrados
+- Histórico com as últimas 20 buscas (nicho, filtros, quantidade de canais);
+  clicar em ↺ reabre os resultados daquela busca sem gastar cota de novo
 - Mini-CRM com status (não contatado, contatado, respondeu, parceria,
   recusou), anotações por lead e filtros
 - Exportação de leads em CSV
