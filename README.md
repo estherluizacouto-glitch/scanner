@@ -46,6 +46,12 @@ elas automaticamente quando uma esgota.
 |---|---|
 | Buscar canais por nicho (`search.list`) | 100 unidades / página (até 50 resultados) |
 | Detalhes do canal — inscritos, país, descrição (`channels.list`) | 1 unidade / lote de até 50 |
+| Checar atividade recente (`activities.list`, só se o filtro estiver ativo) | 1 unidade / canal candidato |
+
+A busca para automaticamente depois de 6 páginas (limite de segurança para não
+estourar sua cota diária sem querer), mesmo que a quantidade desejada não
+tenha sido atingida — por isso buscas muito filtradas às vezes gastam a mesma
+cota independente de quantos canais realmente sobrevivem aos filtros.
 
 Buscas mais amplas (nicho genérico, sem filtro de país) gastam menos cota por
 resultado útil. Buscas muito específicas (nicho + faixa estreita de inscritos
@@ -76,6 +82,7 @@ dispositivo; não sincronizam entre máquinas.
 - Extração automática de e-mail, Twitter/X, Discord e Instagram públicos na
   descrição do canal
 - Filtro "só com e-mail público"
+- Filtro "postou recentemente" (30/60/90/180 dias) — descarta canais inativos
 - Mini-CRM com status (não contatado, contatado, respondeu, parceria,
   recusou), anotações por lead e filtros
 - Exportação de leads em CSV

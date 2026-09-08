@@ -139,6 +139,18 @@ async function ytFetch(path, params){
   return data;
 }
 
+async function hasRecentActivity(channelId, publishedAfterISO){
+  try{
+    const data = await ytFetch('activities', {
+      part:'snippet', channelId, publishedAfter: publishedAfterISO, maxResults: 1
+    });
+    return !!(data.items && data.items.length > 0);
+  }catch(e){
+    // se a checagem falhar, não bloqueia o canal por causa de erro de API
+    return true;
+  }
+}
+
 function extractContacts(text){
   if(!text) return {};
   const email = (text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/) || [])[0];
@@ -171,6 +183,13 @@ async function runSearch(){
   const minSubs = parseInt($('#minSubs').value) || 0;
   const maxSubs = parseInt($('#maxSubs').value) || Infinity;
   const requireEmail = $('#requireEmail').checked;
+  const recentDays = parseInt($('#recentActivity').value) || 0;
+  let publishedAfterISO = null;
+  if(recentDays > 0){
+    const d = new Date();
+    d.setDate(d.getDate() - recentDays);
+    publishedAfterISO = d.toISOString();
+  }
 
   let matched = [];
   let pageToken = undefined;
@@ -181,7 +200,7 @@ async function runSearch(){
   try{
     while(matched.length < desired && pages < maxPages){
       pages++;
-      log(`Escaneando... página ${pages} · ${matched.length}/${desired} encontrados`);
+      log(`Escaneando... página ${pages} · ${matched.length}/${desired} encontrados${publishedAfterISO ? ' · checando atividade recente' : ''}`);
       const searchData = await ytFetch('search', {
         part:'snippet', type:'channel', q: query, maxResults: 50,
         regionCode: country || undefined, pageToken
@@ -205,6 +224,11 @@ async function runSearch(){
           const descText = (ch.snippet?.description||'') + ' ' + (ch.brandingSettings?.channel?.description||'');
           const contacts = extractContacts(descText);
           if(requireEmail && !contacts.email) continue;
+
+          if(publishedAfterISO){
+            const active = await hasRecentActivity(ch.id, publishedAfterISO);
+            if(!active) continue;
+          }
 
           matched.push({
             id: ch.id,

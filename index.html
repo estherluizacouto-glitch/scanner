@@ -71,13 +71,23 @@
         </div>
       </div>
       <div class="field">
+        <label>Postou recentemente</label>
+        <select id="recentActivity">
+          <option value="0">Qualquer época</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="60">Últimos 60 dias</option>
+          <option value="90">Últimos 90 dias</option>
+          <option value="180">Últimos 180 dias</option>
+        </select>
+      </div>
+      <div class="field">
         <label style="display:flex;align-items:center;gap:6px;">
           <input type="checkbox" id="requireEmail" style="width:auto;"> Só com e-mail público
         </label>
       </div>
       <div class="divider"></div>
       <button class="btn" id="searchBtn">Iniciar busca</button>
-      <p class="hint" id="quotaHint">Buscas amplas gastam menos cota e trazem mais resultados. Buscas específicas gastam mais e trazem menos, porém mais precisos.</p>
+      <p class="hint" id="quotaHint">Buscas amplas gastam menos cota e trazem mais resultados. Buscas específicas gastam mais e trazem menos, porém mais precisos. O filtro "Postou recentemente" soma +1 unidade por canal candidato.</p>
     </div>
 
     <!-- MAIN: SEARCH RESULTS -->
