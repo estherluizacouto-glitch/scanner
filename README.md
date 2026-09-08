@@ -46,7 +46,7 @@ elas automaticamente quando uma esgota.
 |---|---|
 | Buscar canais por nicho (`search.list`) | 100 unidades / página (até 50 resultados) |
 | Detalhes do canal — inscritos, país, descrição (`channels.list`) | 1 unidade / lote de até 50 |
-| Checar atividade recente (`activities.list`, só se o filtro estiver ativo) | 1 unidade / canal candidato |
+| Checar data do último vídeo (`playlistItems.list` na playlist de uploads, só se o filtro estiver ativo) | 1 unidade / canal candidato |
 
 A busca para automaticamente depois de 6 páginas (limite de segurança para não
 estourar sua cota diária sem querer), mesmo que a quantidade desejada não
@@ -94,7 +94,20 @@ Scanner descarta automaticamente as buscas mais antigas do histórico.
   recusou), anotações por lead e filtros
 - Exportação de leads em CSV
 
+## Nota sobre o filtro "postou recentemente"
+
+Esse filtro checa a data real do último vídeo de cada canal (via a playlist
+de uploads, `playlistItems.list`) — **não** usa o endpoint `activities.list`
+com `publishedAfter`, porque esse parâmetro está quebrado na API oficial do
+YouTube desde 2016 e simplesmente não filtra nada (retorna atividade do
+canal independente da data pedida). Quando o filtro está ativo, o card do
+canal mostra "último vídeo: Xd atrás" pra você conferir.
+
 ## Limitações conhecidas
+
+- Canais **"Topic"** (auto-gerados pelo YouTube para música/tópicos, ex.
+  "Minecraft - Topic") são filtrados automaticamente — eles não têm dono
+  real nem contato, então não servem pra prospecção.
 
 - O campo de "e-mail público" do YouTube não é mais exposto diretamente pela
   API oficial; o Scanner extrai qualquer e-mail que o criador tenha colocado
