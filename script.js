@@ -2,6 +2,7 @@ const STORE_KEYS = 'scanner_api_keys';
 const STORE_LEADS = 'scanner_leads';
 const STORE_RESULTS = 'scanner_last_results';
 const STORE_HISTORY = 'scanner_history';
+const STORE_QUOTA_DATE = 'scanner_quota_reset_date';
 const MAX_HISTORY = 20;
 
 let apiKeys = [];   // {key, used, exhausted}
@@ -11,6 +12,7 @@ let lastResults = [];
 let history = [];   // [{id, ts, query, country, minSubs, maxSubs, recentDays, requireEmail, results}]
 let leadFilter = 'all';
 let searching = false;
+let lastSearchStats = null; // estatísticas da última busca (p/ explicar 0 resultados), não persiste entre sessões
 
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -20,6 +22,26 @@ function toast(msg){
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+// A cota da YouTube Data API reseta à meia-noite no fuso de Los Angeles
+// (Pacific Time), não na meia-noite local. Sem isso, uma chave marcada como
+// "esgotada" ficaria esgotada pra sempre no localStorage, mesmo depois do
+// Google já ter liberado a cota de novo.
+function pacificDateString(){
+  return new Date().toLocaleDateString('en-CA', {timeZone: 'America/Los_Angeles'});
+}
+function resetQuotaIfNewDay(){
+  const today = pacificDateString();
+  const last = localStorage.getItem(STORE_QUOTA_DATE);
+  if(last !== today){
+    if(apiKeys.length){
+      apiKeys.forEach(k => { k.used = 0; k.exhausted = false; });
+      saveKeys();
+    }
+    localStorage.setItem(STORE_QUOTA_DATE, today);
+    if(last !== null) renderKeys(); // não notifica no primeiríssimo carregamento
+  }
 }
 
 // ---------- storage (localStorage — persists per browser, not synced anywhere) ----------
@@ -32,6 +54,7 @@ function loadState(){
   catch(e){ lastResults = []; }
   try{ history = JSON.parse(localStorage.getItem(STORE_HISTORY) || '[]'); }
   catch(e){ history = []; }
+  resetQuotaIfNewDay();
   renderKeys();
   renderLeads();
   updateLeadBadge();
@@ -141,15 +164,26 @@ function getActiveKey(){
 }
 
 // ---------- YouTube API ----------
-async function ytFetch(path, params){
+function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+async function ytFetch(path, params, retry = 0){
   const key = getActiveKey();
   if(!key) throw new Error('NO_KEY');
   const url = new URL('https://www.googleapis.com/youtube/v3/' + path);
   Object.entries(params).forEach(([k,v])=>{ if(v!==undefined && v!=='') url.searchParams.set(k,v); });
   url.searchParams.set('key', key.key);
   const cost = path === 'search' ? 100 : 1;
-  const res = await fetch(url.toString());
-  const data = await res.json();
+
+  let res, data;
+  try{
+    res = await fetch(url.toString());
+    data = await res.json().catch(()=>({}));
+  }catch(networkErr){
+    // falha de rede (sem internet, DNS, etc.) — também vale retry
+    if(retry < 3){ await sleep(500 * (retry+1)); return ytFetch(path, params, retry+1); }
+    throw new Error('Falha de rede ao chamar a API do YouTube.');
+  }
+
   if(!res.ok){
     const reason = data?.error?.errors?.[0]?.reason || '';
     if(reason === 'quotaExceeded' || reason === 'dailyLimitExceeded'){
@@ -159,7 +193,16 @@ async function ytFetch(path, params){
       if(next) return ytFetch(path, params);
       throw new Error('ALL_KEYS_EXHAUSTED');
     }
-    throw new Error(data?.error?.message || 'Erro na API');
+    // erros passageiros do lado do Google (instabilidade momentânea) — tenta
+    // de novo automaticamente em vez de derrubar a busca inteira
+    const transient = res.status === 503 || res.status === 500 || res.status === 429
+      || reason === 'backendError' || reason === 'rateLimitExceeded' || reason === 'userRateLimitExceeded';
+    if(transient && retry < 3){
+      log(`Instabilidade momentânea do Google (${res.status}), tentando de novo...`);
+      await sleep(600 * (retry+1)); // backoff progressivo
+      return ytFetch(path, params, retry+1);
+    }
+    throw new Error(data?.error?.message || `Erro na API (HTTP ${res.status})`);
   }
   key.used += cost;
   saveKeys(); renderKeys();
@@ -230,6 +273,7 @@ async function runSearch(){
   let pages = 0;
   const maxPages = 6;
   const seen = new Set();
+  const stats = {checked:0, topic:0, subsHidden:0, subsRange:0, country:0, email:0, activity:0};
 
   try{
     while(matched.length < desired && pages < maxPages){
@@ -249,28 +293,29 @@ async function runSearch(){
           part:'snippet,statistics,brandingSettings,contentDetails', id: ids.join(',')
         });
         for(const ch of (chData.items || [])){
+          stats.checked++;
           const title = ch.snippet?.title || '';
           // canais "Topic" são auto-gerados pelo YouTube (música/tópicos), sem
           // dono real, sem contato — sempre têm esse sufixo no título
-          if(/-\s*topic$/i.test(title.trim())) continue;
+          if(/-\s*topic$/i.test(title.trim())){ stats.topic++; continue; }
           const subsHidden = ch.statistics?.hiddenSubscriberCount;
           const subs = parseInt(ch.statistics?.subscriberCount || '0');
-          if(subsHidden) continue;
-          if(subs < minSubs || subs > maxSubs) continue;
-          if(country && ch.snippet?.country && ch.snippet.country.toUpperCase() !== country) continue;
+          if(subsHidden){ stats.subsHidden++; continue; }
+          if(subs < minSubs || subs > maxSubs){ stats.subsRange++; continue; }
+          if(country && ch.snippet?.country && ch.snippet.country.toUpperCase() !== country){ stats.country++; continue; }
 
           const descText = (ch.snippet?.description||'') + ' ' + (ch.brandingSettings?.channel?.description||'');
-          if(/auto-generated by youtube/i.test(descText)) continue; // reforço p/ canais Topic sem o sufixo no título
+          if(/auto-generated by youtube/i.test(descText)){ stats.topic++; continue; } // reforço p/ canais Topic sem o sufixo no título
           const contacts = extractContacts(descText);
-          if(requireEmail && !contacts.email) continue;
+          if(requireEmail && !contacts.email){ stats.email++; continue; }
 
           let lastUpload = null;
           if(publishedAfterISO){
             const uploadsPlaylistId = ch.contentDetails?.relatedPlaylists?.uploads;
             const lastDate = await getLastUploadDate(uploadsPlaylistId);
-            if(lastDate === null) continue; // canal sem vídeos na playlist de uploads
+            if(lastDate === null){ stats.activity++; continue; } // canal sem vídeos na playlist de uploads
             if(lastDate !== undefined){
-              if(lastDate < new Date(publishedAfterISO)) continue; // último vídeo é mais antigo que o filtro
+              if(lastDate < new Date(publishedAfterISO)){ stats.activity++; continue; } // último vídeo é mais antigo que o filtro
               lastUpload = lastDate.toISOString();
             }
             // lastDate === undefined: checagem falhou pontualmente, não bloqueia o canal
@@ -305,6 +350,7 @@ async function runSearch(){
 
   $('#scanLog').style.display = 'none';
   lastResults = matched;
+  lastSearchStats = stats;
   saveResults();
 
   if(matched.length){
@@ -353,6 +399,7 @@ function renderHistory(){
   $$('[data-restore]').forEach(b=>b.addEventListener('click', ()=>{
     const h = history[parseInt(b.dataset.restore)];
     lastResults = h.results;
+    lastSearchStats = null;
     saveResults();
     renderResults();
     $$('.tab-btn').forEach(t=>t.classList.remove('active'));
@@ -380,11 +427,32 @@ function timeAgo(ts){
 function renderResults(){
   const root = $('#resultsRoot');
   if(!lastResults.length){
-    root.innerHTML = `<div class="empty">
-      ${emptyIcon()}
-      <h3>Nenhuma busca ainda</h3>
-      <p>Defina nicho, faixa de inscritos e país no painel à esquerda, depois clique em "Iniciar busca".</p>
-    </div>`;
+    if(lastSearchStats && lastSearchStats.checked > 0){
+      const s = lastSearchStats;
+      const rows = [
+        ['Canais "Topic" (auto-gerados)', s.topic],
+        ['Inscritos ocultos', s.subsHidden],
+        ['Fora da faixa de inscritos', s.subsRange],
+        ['País diferente do filtro', s.country],
+        ['Sem e-mail público', s.email],
+        ['Sem atividade no período', s.activity],
+      ].filter(([,n]) => n > 0);
+      root.innerHTML = `<div class="empty">
+        ${emptyIcon()}
+        <h3>0 resultados — mas a busca rodou</h3>
+        <p>${s.checked} canais foram checados e todos caíram em algum filtro:</p>
+        <div style="text-align:left;margin-top:10px;">
+          ${rows.map(([label,n])=>`<div class="hint">• ${label}: <b style="color:var(--text)">${n}</b></div>`).join('')}
+        </div>
+        <p style="margin-top:10px;">Tente afrouxar a faixa de inscritos, tirar o filtro de país/e-mail, ou aumentar os dias em "postou recentemente".</p>
+      </div>`;
+    } else {
+      root.innerHTML = `<div class="empty">
+        ${emptyIcon()}
+        <h3>Nenhuma busca ainda</h3>
+        <p>Defina nicho, faixa de inscritos e país no painel à esquerda, depois clique em "Iniciar busca".</p>
+      </div>`;
+    }
     return;
   }
   const rows = lastResults.map((c,i)=>`
