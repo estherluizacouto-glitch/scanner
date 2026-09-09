@@ -186,11 +186,18 @@ async function ytFetch(path, params, retry = 0){
 
   if(!res.ok){
     const reason = data?.error?.errors?.[0]?.reason || '';
-    if(reason === 'quotaExceeded' || reason === 'dailyLimitExceeded'){
+    const status = data?.error?.status || '';
+    const errMsg = data?.error?.message || '';
+    // a API mudou o formato do erro de cota: hoje muitas vezes vem sem
+    // "reason: quotaExceeded", só como status RESOURCE_EXHAUSTED + mensagem
+    // de texto genérica — então checamos os dois formatos
+    const isQuotaExceeded = reason === 'quotaExceeded' || reason === 'dailyLimitExceeded'
+      || status === 'RESOURCE_EXHAUSTED' || /quota exceeded/i.test(errMsg);
+    if(isQuotaExceeded){
       key.exhausted = true;
       saveKeys(); renderKeys();
       const next = getActiveKey();
-      if(next) return ytFetch(path, params);
+      if(next){ toast('Essa chave esgotou a cota diária — trocando para a próxima.'); return ytFetch(path, params); }
       throw new Error('ALL_KEYS_EXHAUSTED');
     }
     // erros passageiros do lado do Google (instabilidade momentânea) — tenta
@@ -202,7 +209,7 @@ async function ytFetch(path, params, retry = 0){
       await sleep(600 * (retry+1)); // backoff progressivo
       return ytFetch(path, params, retry+1);
     }
-    throw new Error(data?.error?.message || `Erro na API (HTTP ${res.status})`);
+    throw new Error(errMsg || `Erro na API (HTTP ${res.status})`);
   }
   key.used += cost;
   saveKeys(); renderKeys();
